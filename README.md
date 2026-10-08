@@ -1,181 +1,89 @@
 
-# StegaShield SOC Validation Pilot
-## Dataset Ground Truth and Independent LSB Validation
+# Dataset and Ground Truth Preparation
 
-**Project:** StegaShield SOC Detection Validation Pilot  
-**Day:** 02 of 07  
-**Focus:** Dataset analysis, independent ground truth, LSB embedding, integrity verification, and reproducibility  
-**Environment:** Ubuntu 24.04.5 LTS, ARM64  
-**Status:** Technical investigation completed. Repository evidence verification pending.
+## Overview
 
----
+Day 2 establishes the dataset and ground truth foundation for my StegaShield detection validation pilot before any controlled image is submitted to the detection engine.
 
-## 1. Investigation Objective
+The goal was to understand the reference dataset, identify possible validation limitations, independently create known clean and LSB-modified images, and verify that the resulting artifacts could be reproduced.
 
-Before testing StegaShield, I needed to establish something fundamental:
-
-**How can I determine whether StegaShield correctly identifies a modified image if I have not independently established which images are clean and which contain hidden data?**
-
-My objective for Day 2 was to:
-
-1. Examine the team-linked reference dataset.
-2. Understand its structure and potential validation limitations.
-3. Create an independent clean image.
-4. Embed a controlled payload using LSB substitution.
-5. Verify the embedded payload and actual pixel changes.
-6. Preserve SHA-256 fingerprints.
-7. Reproduce the experiment.
-8. Establish a ground-truth manifest before model testing.
-
-The investigation deliberately separates known ground truth from future detector predictions.
+This gives me a controlled starting point for evaluating StegaShield without allowing its predictions to determine the correct labels.
 
 ---
 
-## 2. Dataset Strategy
+## Dataset Strategy
 
-I separated the investigation into two datasets.
+The pilot separates two sources of image data.
 
-### Dataset A — Team-Linked Reference Dataset
+**Dataset A — Reference Dataset**
 
-Source:
+The StegaShield team identified the following dataset as material used during their training and testing:
 
 https://www.kaggle.com/datasets/marcozuppelli/stegoimagesdataset/data
 
-The StegaShield team identified this dataset as material used during training and testing.
+This dataset provides reference material for understanding the model's intended detection scope.
 
-Therefore, I am using it to understand the expected image structures and reproduce known conditions, **not as independent evidence of model generalization**.
+However, because it was used during model development, results from that dataset alone cannot establish independent generalization.
 
-### Dataset B — Independent Validation Dataset
+**Dataset B — Independent Dataset**
 
-I constructed a separate controlled dataset on Ubuntu.
+Dataset B is created separately for this pilot.
 
-Its purpose is to establish ground truth without relying on StegaShield's predictions.
+Its purpose is to provide samples with known ground truth established before StegaShield analyzes them.
 
-The first controlled pair consists of:
+The first controlled pair contains:
 
-| Test ID | Ground Truth | Description |
-|---|---|---|
-| SS-001-CLEAN | CLEAN | Original synthetic RGB image |
-| SS-001-LSB-RAW | MODIFIED | Same parent image with controlled raw payload embedded using RGB LSB substitution |
+- One clean RGB image
+- One modified image derived from that same clean parent
+- One controlled raw payload
+- One RGB least significant bit embedding method
 
-This first pair is a reproducible proof of methodology, not a statistically representative validation population.
+The independent dataset currently contains one verified pair.
 
----
-
-## 3. Dataset A — Reference Dataset Investigation
-
-### 3.1 Dataset population
-
-Archive inspection and metadata reconciliation established the following image populations:
-
-| Partition | Clean | Standard Stego | Base64 Variant | ZIP Variant |
-|---|---:|---:|---:|---:|
-| Train | 4,000 | 12,000 | — | — |
-| Validation | 2,000 | 6,000 | — | — |
-| Test | 2,000 | 6,000 | 6,000 | 6,000 |
-| **Total** | **8,000** | **24,000** | **6,000** | **6,000** |
-
-**Total archive image population: 44,000.**
-
-The metadata CSV describes the ordinary clean and stego populations, while the archive contains additional Base64 and ZIP test variants.
-
-The payload categories in the metadata include:
-
-- JavaScript
-- JavaScript in HTML
-- PowerShell
-- Ethereum addresses
-- URL/IP addresses
-
-These are payload categories, not necessarily distinct steganographic embedding algorithms.
-
-### 3.2 Important finding — RGB versus RGBA separation
-
-PNG-header inspection revealed a systematic structural difference.
-
-| Dataset label | PNG color structure | Observed count |
-|---|---|---:|
-| Clean | RGBA | 8,000 |
-| Stego, including variants | RGB | 36,000 |
-
-All inspected clean files used RGBA, while all inspected stego files used RGB.
-
-This creates a **potential dataset confounding variable**.
-
-A classifier evaluated on this dataset could theoretically distinguish the classes using PNG color type rather than identifying the intended steganographic modifications.
-
-However, this investigation does **not** establish that StegaShield relies on this shortcut.
-
-That question requires controlled model testing.
-
-### 3.3 Candidate parent and stego relationship
-
-The reference dataset contains files with matching numerical identifiers.
-
-Example:
-
-```text
-04001.png
-image_04001_eth_0.png
-image_04001_html_0.png
-image_04001_url_0.png
-```
-
-The shared identifier suggests a possible clean-parent relationship.
-
-For one candidate pair:
-
-`04001.png` and `image_04001_eth_0.png`
-
-The comparison found:
-
-| Measurement | Result |
-|---|---:|
-| Dimensions | 512 × 512 |
-| Changed RGB pixels | 106 |
-| Changed RGB channels | 156 |
-| Changes outside bit 0 | 0 |
-| Red channel changes | 48 |
-| Green channel changes | 50 |
-| Blue channel changes | 58 |
-
-All changed pixels occurred in the first image row.
-
-These observations are consistent with sequential LSB substitution, but they do not independently establish the complete dataset-generation algorithm.
-
-### 3.4 Dataset A interpretation
-
-**Observed**
-
-- Clean and stego labels perfectly corresponded to RGBA and RGB PNG color types in the inspected archive.
-- The examined candidate image pair differed only in RGB bit 0.
-- The observed changes were concentrated in the first row.
-
-**Interpretation**
-
-The reference dataset contains an image-format difference that could confound model evaluation.
-
-**Unknown**
-
-- Whether StegaShield's preprocessing retains or removes this difference.
-- Whether the model uses PNG color structure as a classification shortcut.
-- Whether the observed sample-generation pattern applies identically to every embedding variant.
-
-**Engineering decision:** Do not use Dataset A alone to establish independent detection accuracy.
+This is sufficient to establish the initial testing procedure, but not sufficient to measure overall detection accuracy.
 
 ---
 
-## 4. Dataset B — Independent Ground Truth
+# Lab Role During Day 2
 
-### 4.1 Controlled workspace
+The Day 1 baseline established three systems:
 
-The independent dataset was created under:
+**Mac M2 Host**
+- SOC analysis system
+- Splunk Enterprise
+- Lab management
+
+**Windows Endpoint**
+- Controlled endpoint
+- Sysmon
+- Windows Event Logs
+- Splunk Universal Forwarder
+
+**Ubuntu Server**
+- Controlled server
+- Dataset generation
+- Ground truth preparation
+- Future StegaShield host
+- Future HTTPS receiver
+- Future Zeek sensor
+
+Day 2 work was performed on Ubuntu.
+
+The purpose was not to test network transfers or correlate SOC telemetry yet.
+
+The purpose was to establish trustworthy image samples before introducing those additional components.
+
+---
+
+# Independent Dataset Workspace
+
+The Dataset B workspace was created under:
 
 ```text
 ~/stegashield-pilot/dataset-b-independent/
 ```
 
-The workspace separates:
+The investigation used the following directory structure:
 
 ```text
 dataset-b-independent/
@@ -185,64 +93,132 @@ dataset-b-independent/
 └── evidence/
 ```
 
-This keeps original samples, modified samples, reproducibility scripts, and supporting evidence logically separated.
+Each directory has a specific purpose.
 
-### 4.2 Clean image generation
+**clean/**
 
-The first clean image was generated using:
+Stores original images that have not intentionally undergone the controlled embedding process.
 
-- Python 3.12.3
-- Pillow 10.2.0
-- Fixed random seed: `20261007`
-- Image dimensions: 512 × 512
-- Color mode: RGB
-- Output format: PNG
+**modified/**
 
-The generator uses deterministic pseudorandom RGB values.
+Stores images generated from known clean parents using a documented modification method.
 
-The clean image was generated without intentionally embedding a hidden payload.
+**scripts/**
 
-**Limitation:** A synthetic noise-like image is not equivalent to a natural photograph. Its statistical characteristics may affect future detector scores.
+Stores the Python programs used to generate and modify the images.
 
-The creation method was preserved in:
+**evidence/**
 
-`scripts/generate_clean.py`
+Stores the manifest, SHA-256 records, reproduced artifacts, and verification evidence.
 
-### Evidence 01 — Independent clean-image creation
+### Why this matters
 
-![Independent clean-image generation](evidence/01-clean-image-generation.png)
+The clean parent and modified image must remain distinguishable.
 
-The screenshot documents the original controlled image creation and its reported dimensions and RGB mode.
+If the original image is overwritten, the investigation loses its controlled comparison.
+
+Separating the files also makes it easier to verify that a later detector result refers to the intended sample.
 
 ---
 
-## 5. Controlled LSB Embedding
+# Clean Image Generation
 
-### 5.1 Payload
+The first independent clean image was generated using Python and Pillow.
 
-The controlled test payload was:
+The generator used:
+
+```text
+Image dimensions: 512 × 512
+Color mode: RGB
+Image format: PNG
+Random seed: 20261007
+```
+
+The script was saved as:
+
+```text
+scripts/generate_clean.py
+```
+
+The generated image was saved as:
+
+```text
+clean/SS-001-CLEAN.png
+```
+
+The generator creates deterministic pseudorandom RGB pixel values.
+
+Using a fixed seed means that running the same script with the same parameters should produce the same pixel data.
+
+The script also refuses to overwrite an existing output file.
+
+![Clean image generation and reproduction](evidence/01-clean-image-generation.png)
+
+### Why this matters
+
+The clean image was created independently of StegaShield.
+
+Its ground truth was established from the controlled generation procedure, not from a model prediction.
+
+Using RGB for the independent clean parent also ensures that its modified counterpart can retain the same image mode.
+
+### Limitation
+
+This image contains synthetic pseudorandom pixel values.
+
+It is not representative of an ordinary photograph.
+
+That distinction matters because image statistics can influence steganalysis models.
+
+The results from this first sample cannot automatically be generalized to natural images.
+
+---
+
+# Controlled LSB Embedding
+
+The next step was to create a modified image from the clean parent.
+
+The embedding script was saved as:
+
+```text
+scripts/embed_lsb.py
+```
+
+The source image was:
+
+```text
+clean/SS-001-CLEAN.png
+```
+
+The modified output was:
+
+```text
+modified/SS-001-LSB-RAW.png
+```
+
+The controlled payload was:
 
 ```text
 STEGASHIELD_PILOT_SS001
 ```
 
-| Property | Value |
-|---|---|
-| Payload length | 23 bytes |
-| Payload preparation | Raw text |
-| Embedding method | RGB least significant bit |
-| Length header | 32 bits |
-| Total embedded bits | 216 |
+The payload was 23 bytes.
 
-The original clean image was preserved.
+The script first encodes the payload length using a 32-bit header.
 
-The modified image was created as:
+It then converts the payload into bits.
 
-`modified/SS-001-LSB-RAW.png`
+The total number of positions used for embedding was:
 
-### 5.2 Embedding method
+```text
+32-bit length header
++
+184 payload bits
+=
+216 embedded bit positions
+```
 
-The embedding script writes payload bits sequentially into RGB channel values.
+The script modifies the least significant bits of successive RGB channel values.
 
 The central operation is:
 
@@ -250,120 +226,239 @@ The central operation is:
 channels[index] = (channels[index] & 254) | int(bit)
 ```
 
-The operation clears the lowest bit and replaces it with the intended payload bit.
+The operation clears the lowest bit and writes the intended payload bit.
 
-It does not intentionally modify the other seven bits of a channel.
-
-The script was preserved as:
-
-`scripts/embed_lsb.py`
-
-### Evidence 02 — Controlled LSB embedding
+The remaining seven bits are preserved by this operation.
 
 ![Controlled LSB embedding](evidence/02-lsb-embedding.png)
 
-The screenshot documents the payload length, total embedded bits, and generated modified-image path.
+### Why this matters
+
+The modified image has a known clean parent.
+
+The payload is known.
+
+The payload preparation method is known.
+
+The embedding method is known.
+
+This establishes the basis for comparing future StegaShield results against independently assigned ground truth.
+
+### Important distinction
+
+Raw, Base64, and ZIP describe different ways of preparing payload data.
+
+LSB describes how the data is embedded into image pixels.
+
+Day 2's verified independent sample uses raw payload preparation and RGB LSB embedding.
+
+Base64 and ZIP variants are not part of this verified Dataset B pair.
 
 ---
 
-## 6. Independent Payload and Pixel Verification
+# Ground Truth Labels
 
-After creating the modified image, I verified that the payload could be recovered by reading its RGB least significant bits.
+The two test samples were assigned the following labels:
 
-The extraction returned:
+| Test ID | Ground Truth | Parent |
+|---|---|---|
+| `SS-001-CLEAN` | CLEAN | None |
+| `SS-001-LSB-RAW` | MODIFIED | `SS-001-CLEAN` |
+
+The first image is the original controlled carrier.
+
+The second image was generated from that carrier by the LSB embedding script.
+
+The modified label does not mean that the image is malicious.
+
+It means that the image underwent the documented embedding operation.
+
+### Why this matters
+
+StegaShield will later produce its own predictions.
+
+Those predictions must be compared against the established labels.
+
+A model score must not become the source of ground truth.
+
+Otherwise, the investigation would be using the detector to validate itself.
+
+---
+
+# LSB Verification Scope
+
+The embedding script documents the controlled transformation.
+
+It uses the clean parent as input, writes the length header and payload bits, and saves a separate modified PNG.
+
+The operation targets only the least significant bit of each selected RGB channel.
+
+However, the number of embedded bit positions is not necessarily the number of channel values that changed.
+
+For example, writing a `1` into a channel whose lowest bit is already `1` does not change that channel value.
+
+The verified embedding procedure used 216 bit positions.
+
+This does not mean 216 channels necessarily changed.
+
+![LSB verification evidence](evidence/03-lsb-pixel-verification.png)
+
+### What this proves
+
+The preserved script establishes how the controlled modification was performed.
+
+The generated output and reproducibility checks establish that the process produced a stable modified artifact.
+
+### What remains separate
+
+A full extraction test or an independently documented pixel-difference count should be reported only when supported by its actual verification output.
+
+The embedding script alone does not establish a measured changed-pixel count or successful extraction by a separate decoder.
+
+---
+
+# SHA-256 Integrity Baseline
+
+After generating the images, SHA-256 fingerprints were recorded.
+
+The clean image produced:
 
 ```text
-Declared payload length: 23
-Recovered payload: STEGASHIELD_PILOT_SS001
-Matches expected: True
+Test ID:
+SS-001-CLEAN
+
+SHA-256:
+f8d20edc5ca3b65273adc0bd201391fca3293f60e6c29f56730fb2310c925e61
 ```
 
-I then compared the clean and modified images.
+The modified image produced:
 
-| Measurement | Observed result |
-|---|---:|
-| Clean dimensions | 512 × 512 |
-| Modified dimensions | 512 × 512 |
-| Changed pixels | 64 |
-| Changed RGB channels | 112 |
-| Changes beyond the LSB | 0 |
+```text
+Test ID:
+SS-001-LSB-RAW
 
-The difference between 216 embedded bit positions and 112 changed channel values is expected.
+SHA-256:
+98c5d60f0e3d1b9540ece2586c5f6677ab08a48a0461686ccac50a885c35f0f6
+```
 
-Writing a payload bit does not change a channel when its existing lowest bit already matches the intended value.
+The recorded hash files were:
 
-### Evidence 03 — Payload recovery and pixel verification
+```text
+evidence/SS-001-CLEAN.sha256
+evidence/SS-001-LSB-RAW.sha256
+```
 
-![LSB pixel verification](evidence/03-lsb-pixel-verification.png)
+### Why this matters
 
-The selected screenshot documents the actual pixel-comparison results. Payload recovery is recorded separately in the investigation observations.
+A SHA-256 fingerprint identifies the exact bytes of a file.
 
-### Interpretation
+If the file changes, its digest will ordinarily change.
 
-The modified image contains a recoverable controlled payload.
+This allows the investigation to detect accidental modifications to the test artifacts.
 
-All observed RGB channel changes were limited to the least significant bit.
+However:
 
-This establishes the intended modified ground truth independently of StegaShield.
+```text
+Different hashes ≠ proof of steganography
+```
 
-It does not establish StegaShield detection performance.
+The hashes establish file identity and integrity.
 
----
-
-## 7. SHA-256 Integrity and Reproducibility
-
-### 7.1 Recorded image fingerprints
-
-| Sample | SHA-256 |
-|---|---|
-| SS-001-CLEAN | `f8d20edc5ca3b65273adc0bd201391fca3293f60e6c29f56730fb2310c925e61` |
-| SS-001-LSB-RAW | `98c5d60f0e3d1b9540ece2586c5f6677ab08a48a0461686ccac50a885c35f0f6` |
-
-These fingerprints identify the exact file bytes used in the controlled experiment.
-
-A SHA-256 difference alone does not prove steganography.
-
-The embedding procedure, payload recovery, and pixel-level analysis establish why the modified sample differs.
-
-### 7.2 Clean image reproducibility
-
-The saved generation script reproduced the clean image using the same fixed random seed.
-
-The reproduced PNG and original clean PNG produced identical SHA-256 hashes.
-
-### 7.3 Modified image reproducibility
-
-The saved LSB embedding script was executed against the original clean parent using a separate output path.
-
-The reproduced modified image and original modified image produced identical SHA-256 hashes.
-
-Both modified-image checks subsequently returned `OK`.
-
-### Evidence 04 — SHA-256 reproducibility
-
-![SHA256 reproducibility verification](evidence/04-sha256-reproducibility.png)
-
-This screenshot demonstrates matching fingerprints for the original and reproduced modified samples.
-
-### 7.4 Evidence protection
-
-Both generation scripts include overwrite protection.
-
-Attempts to reuse existing output paths raised `FileExistsError`.
-
-Subsequent checksum verification confirmed the original images still matched their recorded fingerprints.
-
-This protects the established test artifacts from accidental replacement during repeated experiments.
+The controlled embedding procedure establishes why the modified image was created.
 
 ---
 
-## 8. Ground-Truth Manifest
+# Clean Image Reproducibility
 
-The independent ground-truth manifest was saved as:
+The clean image generator was executed again using a separate output path.
 
-`evidence/ground-truth-manifest.csv`
+The reproduced file was saved as:
 
-Its fields include:
+```text
+evidence/SS-001-REPRODUCED.png
+```
+
+The reproduced clean image generated the same SHA-256 digest as the original clean image.
+
+This confirmed byte-for-byte reproduction of the clean artifact under the tested conditions.
+
+### Why this matters
+
+The result demonstrates that the saved generator and its fixed seed can recreate the same clean sample.
+
+The ground truth does not depend on an image that can no longer be reproduced.
+
+---
+
+# Modified Image Reproducibility
+
+The LSB embedding script was executed again against the original clean parent.
+
+The reproduced modified image was saved as:
+
+```text
+evidence/SS-001-LSB-REPRODUCED.png
+```
+
+The original modified image and reproduced modified image generated identical SHA-256 fingerprints:
+
+```text
+98c5d60f0e3d1b9540ece2586c5f6677ab08a48a0461686ccac50a885c35f0f6
+```
+
+The checksum verification returned `OK` for the original and reproduced modified artifacts.
+
+The reproducibility checksum record was saved as:
+
+```text
+evidence/SS-001-reproducibility.sha256
+```
+
+![SHA-256 reproducibility verification](evidence/04-sha256-reproducibility.png)
+
+## What this proves
+
+The saved embedding script reproduced the same modified PNG from the same clean parent.
+
+This supports the repeatability of the controlled test condition.
+
+It does not prove that StegaShield can detect the embedded payload.
+
+That remains a separate model-evaluation question.
+
+---
+
+# Evidence Protection
+
+Both image-generation scripts contain overwrite protection.
+
+When an existing output path was supplied, the scripts raised a `FileExistsError`.
+
+This behavior was intentional.
+
+It prevents a later run from silently replacing an established test artifact.
+
+Subsequent checksum verification confirmed that the recorded artifacts remained consistent.
+
+### Why this matters
+
+In an investigation, preserving the original test material is important.
+
+If a file is replaced without documentation, its earlier ground-truth record may no longer refer to the same bytes.
+
+Overwrite protection reduces that risk.
+
+---
+
+# Ground Truth Manifest
+
+The manifest was saved as:
+
+```text
+evidence/ground-truth-manifest.csv
+```
+
+Its fields are:
 
 ```text
 test_id
@@ -376,16 +471,32 @@ payload_bytes
 sha256
 ```
 
-Two records were established:
+The manifest contains two records.
 
-| Test ID | Parent | Ground truth | Embedding |
-|---|---|---|---|
-| SS-001-CLEAN | None | CLEAN | None |
-| SS-001-LSB-RAW | SS-001-CLEAN | MODIFIED | LSB RGB |
+| Test ID | Relative Path | Ground Truth | Embedding Method | Payload Bytes |
+|---|---|---|---|---:|
+| `SS-001-CLEAN` | `clean/SS-001-CLEAN.png` | CLEAN | none | 0 |
+| `SS-001-LSB-RAW` | `modified/SS-001-LSB-RAW.png` | MODIFIED | LSB_RGB | 23 |
 
-The manifest was validated against the actual image files.
+The modified sample references the clean sample through its parent ID.
 
-The verification returned:
+This preserves the relationship between the original carrier and the controlled modification.
+
+---
+
+# Manifest Integrity Verification
+
+The manifest was validated using Python.
+
+The verification process:
+
+1. Read the CSV records.
+2. Resolved each relative path against the Dataset B root.
+3. Checked that each referenced file existed.
+4. Recalculated its SHA-256 digest.
+5. Compared the calculated digest against the manifest value.
+
+The output was:
 
 ```text
 SS-001-CLEAN PASS
@@ -393,80 +504,323 @@ SS-001-LSB-RAW PASS
 Records checked: 2
 ```
 
-### Evidence 05 — Ground-truth manifest validation
+![Ground truth manifest validation](evidence/05-ground-truth-validation.png)
 
-![Ground-truth manifest validation](evidence/05-ground-truth-validation.png)
+## What this proves
 
-This screenshot documents the final file-integrity checks against the recorded manifest.
+Both manifest entries referenced existing files.
 
-**Important:** The manifest establishes ground truth before model testing. StegaShield's future classifications must be evaluated against these records, not used to redefine them.
+Both files matched their recorded SHA-256 fingerprints.
 
----
+The manifest and current artifacts were consistent at the time of verification.
 
-## 9. Engineering Decisions
+This does not establish statistical model performance.
 
-| Decision | Why it was made | Alternative considered | What could change |
-|---|---|---|---|
-| Separate Dataset A and Dataset B | Avoid training/testing overlap in independent validation | Rely only on the reference dataset | Generalization claims would be weaker |
-| Use one clean parent and modified sibling | Control the original carrier | Compare unrelated images | Image-content differences could confound the comparison |
-| Use RGB for both independent samples | Avoid the observed RGB/RGBA class mismatch | Preserve the reference dataset's differing formats | Format differences could influence scores |
-| Use deterministic generation | Enable repeatable image creation | Unseeded random generation | Exact reproduction would not be guaranteed |
-| Start with raw LSB | Isolate one embedding condition | Mix raw, Base64, ZIP, and other methods | Attribution of results would become more difficult |
-| Record SHA-256 fingerprints | Verify file integrity | Depend on filenames alone | Undetected file changes could invalidate comparisons |
-| Preserve scripts | Support reproducibility | Depend only on terminal screenshots | Another researcher could not readily repeat the procedure |
-| Refuse overwrites | Protect established evidence | Regenerate files in place | Previously validated artifacts could be replaced |
-
-The investigation followed the principle of changing one meaningful variable at a time and verifying the actual result.
+It establishes the integrity of the initial independent test pair.
 
 ---
 
-## 10. SOC and Detection Engineering Relevance
+# Engineering Decisions
 
-This Day establishes the evidence required for later detector evaluation.
+Several technical decisions were made during Day 2.
 
-It does not establish malicious intent, network exfiltration, or successful StegaShield detection.
+## 1. Separate Independent Ground Truth From Reference Data
 
-These are separate questions:
+**What**
 
-**Was an image transferred?**
+Create Dataset B independently rather than relying only on the team-linked dataset.
 
-Requires transfer or network evidence.
+**Why**
 
-**Does the image contain intentionally embedded information?**
+The team identified the reference dataset as material used during training and testing.
 
-Requires content-level evidence and independently established ground truth.
+Using only that dataset could weaken claims of independent generalization.
 
-**Did StegaShield classify the image correctly?**
+**Alternative**
 
-Requires comparing the model's actual prediction against the known label.
+Use the existing reference dataset for every test.
 
-**Was the activity malicious exfiltration?**
+**Evidence**
 
-Requires additional behavioral context and investigation.
+The team's stated training/testing history establishes the overlap concern.
 
-A high model score alone cannot answer all four questions.
+**What would change**
 
----
-
-## 11. Limitations
-
-The independent dataset currently contains only one controlled clean/modified pair.
-
-The clean parent is synthetic random RGB data rather than a natural photograph.
-
-The modified sample uses one sequential LSB implementation and one raw payload.
-
-This Day does not establish performance across other LSB algorithms, payload preparation variants, image formats, or natural-image categories.
-
-The Dataset A RGB/RGBA difference is a demonstrated dataset characteristic, not proof that StegaShield relies on that characteristic.
-
-No model predictions, probability thresholds, precision, recall, or false-positive rates have been measured during this Day.
+Without independently generated samples, later model results could be difficult to interpret as genuinely independent validation.
 
 ---
 
-## 12. Evidence and Reproduction Artifacts
+## 2. Preserve the Clean Parent
 
-The following evidence filenames are used by this README:
+**What**
+
+Generate the modified image as a separate file.
+
+**Why**
+
+The investigation needs a stable original for comparison.
+
+**Alternative**
+
+Modify the original file in place.
+
+**Evidence**
+
+The scripts generated distinct clean and modified paths.
+
+**What would change**
+
+Overwriting the parent would remove the controlled reference image and weaken reproducibility.
+
+---
+
+## 3. Use Deterministic Generation
+
+**What**
+
+Use a fixed random seed for the synthetic clean carrier.
+
+**Why**
+
+The same image must be reproducible.
+
+**Alternative**
+
+Generate a new random image on every execution.
+
+**Evidence**
+
+The reproduced clean image matched the original SHA-256 digest.
+
+**What would change**
+
+Without deterministic generation, repeating the script would not reliably reproduce the same artifact.
+
+---
+
+## 4. Isolate One Embedding Condition
+
+**What**
+
+Start with a raw 23-byte payload embedded through RGB LSB substitution.
+
+**Why**
+
+The first experiment should have a controlled and understandable modification.
+
+**Alternative**
+
+Introduce raw, Base64, ZIP, and other methods simultaneously.
+
+**Evidence**
+
+The saved embedding script documents the exact operation and payload.
+
+**What would change**
+
+Changing several variables together would make future detector behavior harder to attribute to a particular condition.
+
+---
+
+## 5. Preserve Integrity Evidence
+
+**What**
+
+Record SHA-256 fingerprints and protect output paths from overwriting.
+
+**Why**
+
+The test files must remain stable and identifiable.
+
+**Alternative**
+
+Depend only on filenames and manually regenerated artifacts.
+
+**Evidence**
+
+Checksum verification passed and the scripts rejected existing output paths.
+
+**What would change**
+
+Undocumented file replacement could invalidate later comparisons.
+
+---
+
+# Day 2 Analysis
+
+## Observed
+
+- An independent Dataset B workspace was established on Ubuntu.
+- A synthetic 512 × 512 RGB PNG was generated using a fixed random seed.
+- The clean image was saved as `SS-001-CLEAN.png`.
+- A 23-byte controlled payload was embedded into a separate image using RGB LSB substitution.
+- The embedding procedure used 216 bit positions, including the payload-length header.
+- The modified image was saved as `SS-001-LSB-RAW.png`.
+- Both original images received SHA-256 fingerprints.
+- The clean image was reproduced with an identical digest.
+- The modified image was reproduced with an identical digest.
+- Existing-file overwrite attempts were rejected.
+- Both ground-truth manifest records passed integrity verification.
+
+---
+
+## Correlated
+
+The preserved generation scripts, clean parent, modified image, and SHA-256 records support the following evidence chain:
+
+```text
+Deterministic Clean Image Generator
+              |
+              v
+       SS-001-CLEAN
+              |
+              v
+     Controlled LSB Embedding
+              |
+              v
+       SS-001-LSB-RAW
+              |
+              v
+      SHA-256 Verification
+              |
+              v
+     Ground Truth Manifest
+```
+
+The reproduction checks establish that the original outputs can be regenerated under the tested conditions.
+
+The manifest checks establish that the current files match their recorded fingerprints.
+
+These observations support the integrity of the independent sample pair.
+
+---
+
+## Interpretation
+
+Day 2 established a controlled foundation for evaluating StegaShield.
+
+The clean and modified labels were assigned independently of the detection engine.
+
+The image-generation procedure was preserved.
+
+The files were fingerprinted.
+
+The original outputs were reproduced.
+
+The manifest was checked against the actual files.
+
+Most importantly:
+
+```text
+Ground truth ≠ model prediction
+
+File integrity ≠ steganography detection
+
+LSB embedding ≠ malicious intent
+
+Modified image ≠ confirmed exfiltration
+```
+
+Each claim requires its own supporting evidence.
+
+---
+
+# Unknown
+
+Day 2 does not answer whether:
+
+- StegaShield will classify the clean image correctly.
+- StegaShield will classify the modified image correctly.
+- The model will produce repeatable probability scores.
+- The synthetic carrier will influence the model's prediction.
+- Different payload sizes will change detection results.
+- Base64 or ZIP payload preparation will affect model behavior.
+- Natural photographs will produce comparable results.
+- The model will produce false positives or false negatives.
+- Network telemetry will provide useful context for an image investigation.
+- StegaShield results can be correlated effectively with Splunk, Sysmon, and Zeek.
+
+Those questions belong to later stages of the pilot.
+
+---
+
+# Evidence Gaps
+
+Several limitations remain.
+
+### Dataset Size
+
+Dataset B currently contains one independently verified clean/modified pair.
+
+This is not enough to calculate meaningful overall detection-performance metrics.
+
+### Carrier Diversity
+
+The first carrier is a synthetic pseudorandom RGB image.
+
+Natural images and other carrier types have not yet been established as independent test populations.
+
+### Payload Variants
+
+The verified sample uses raw payload preparation.
+
+Base64 and ZIP variants have not yet been independently generated and verified in Dataset B.
+
+### Extraction and Pixel-Level Measurements
+
+The documented embedding script establishes the intended operation.
+
+A separately evidenced extraction result and measured changed-pixel count should be included only if the corresponding verification outputs are available.
+
+### Detector Results
+
+No StegaShield probability scores or classifications have been collected during Day 2.
+
+No detection-performance conclusion can be made yet.
+
+---
+
+# Day 2 Disposition
+
+**Proceed to Day 3: StegaShield Installation and Clean Baseline Testing.**
+
+The first independent clean/modified pair has been generated and verified.
+
+The original and reproduced files match their recorded SHA-256 fingerprints.
+
+The ground-truth manifest passed verification for both records.
+
+The technical preparation for the first controlled sample pair is complete.
+
+The public Day 2 repository should be marked complete only after the README, screenshots, scripts, manifest, and published evidence paths have been verified.
+
+---
+
+# Day 2 Lesson
+
+Independent ground truth must exist before evaluating a detection engine.
+
+During this stage I established:
+
+- a controlled clean image
+- a known LSB-modified counterpart
+- a documented payload and embedding method
+- a preserved clean-parent relationship
+- SHA-256 fingerprints
+- reproducible generation scripts
+- a validated ground-truth manifest
+
+The important lesson is that a detector cannot be meaningfully evaluated by treating its own predictions as the correct answers.
+
+The correct labels must come from independent evidence.
+
+That is what Day 2 establishes for the first controlled sample pair.
+
+---
+
+# Evidence
+
+The Day 2 public screenshot evidence is organized as:
 
 ```text
 evidence/
@@ -474,14 +828,12 @@ evidence/
 ├── 02-lsb-embedding.png
 ├── 03-lsb-pixel-verification.png
 ├── 04-sha256-reproducibility.png
-├── 05-ground-truth-validation.png
-├── ground-truth-manifest.csv
-├── SS-001-CLEAN.sha256
-├── SS-001-LSB-RAW.sha256
-└── SS-001-reproducibility.sha256
+└── 05-ground-truth-validation.png
 ```
 
-Supporting sample and script paths:
+Each screenshot is intended to prove a distinct investigation stage rather than repeat the same information.
+
+The supporting Dataset B artifacts include:
 
 ```text
 clean/
@@ -493,66 +845,24 @@ modified/
 scripts/
 ├── generate_clean.py
 └── embed_lsb.py
+
+evidence/
+├── ground-truth-manifest.csv
+├── SS-001-CLEAN.sha256
+├── SS-001-LSB-RAW.sha256
+└── SS-001-reproducibility.sha256
 ```
 
-The reproduced PNG files were used to verify exact reproduction and are not additional independent test samples.
-
-**Evidence publication requirement:** The five Markdown image references above must be matched to genuine screenshots with those exact filenames before this README is considered publication-ready.
-
-No generated terminal screenshots or reconstructed outputs should be substituted for the original evidence.
+The reproduced PNG files are verification artifacts, not additional independent test samples.
 
 ---
 
-## 13. Day 2 Findings
+## Next Investigation
 
-The investigation established three main findings.
+**Day 3: StegaShield Installation and Clean Baseline Testing**
 
-**Finding 01 — Reference dataset confounding risk**
+The next stage will establish the StegaShield deployment and test known-clean images.
 
-Dataset A contains a systematic RGB/RGBA difference between clean and stego labels. This creates a potential shortcut-learning risk that must be controlled during independent evaluation.
+I will record the detector's actual predictions and probability scores, preserve the relevant evidence, and compare its output against independently established ground truth.
 
-**Finding 02 — Independent ground truth**
-
-A clean image and its controlled LSB-modified counterpart were constructed and verified without using StegaShield to determine their labels.
-
-**Finding 03 — Reproducibility**
-
-Both original samples were reproduced using preserved scripts, and matching SHA-256 fingerprints confirmed byte-for-byte reproducibility under the tested conditions.
-
-These findings provide a controlled starting point for future StegaShield testing.
-
----
-
-## 14. Day 2 Status and Next Stage
-
-**Technical investigation:** Completed for the first controlled sample pair.
-
-**Ground-truth verification:** Passed.
-
-**Repository publication:** Pending final evidence packaging and review.
-
-The Day 2 repository will be marked complete only after the README, genuine screenshots, scripts, manifest, hashes, and published paths have been verified.
-
-### Next — Day 3: StegaShield Clean Baseline
-
-The next stage will establish the StegaShield deployment and submit known-clean material.
-
-We will record actual model probability scores, labels, analysis identifiers, and available application evidence.
-
-Model outputs will be compared against independently established ground truth.
-
-No detection-performance conclusions will be made before the relevant tests have been executed.
-
----
-
-## Project Navigation
-
-**Master Repository:** [StegaShield SOC Validation Pilot](https://github.com/WiLL75G/stegashield-soc-validation)
-
-**Day 01:** [Environment Baseline](https://github.com/WiLL75G/stegashield-day-01-environment-baseline)
-
-**Day 02:** Independent Ground Truth and LSB Validation
-
----
-
-**Investigation principle:** Establish ground truth first. Preserve the evidence. Test the detector. Correlate the results. Draw conclusions only where the evidence supports them.
+The goal is to begin evaluating detector behavior without confusing a model signal with proof of malicious activity.
