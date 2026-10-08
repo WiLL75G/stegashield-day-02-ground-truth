@@ -1,6 +1,6 @@
 
 # StegaShield SOC Validation Pilot
-## Day 02 — Dataset Ground Truth and Independent LSB Validation
+## Dataset Ground Truth and Independent LSB Validation
 
 **Project:** StegaShield SOC Detection Validation Pilot  
 **Day:** 02 of 07  
